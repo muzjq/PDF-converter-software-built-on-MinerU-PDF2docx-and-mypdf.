@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>MinerU 日志查看</title>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #f5f5f5; }
+        .navbar { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 1rem 2rem; color: white; }
+        .navbar h1 { font-size: 1.5rem; }
+        .container { max-width: 1400px; margin: 2rem auto; padding: 0 2rem; }
+        .filters { background: white; border-radius: 10px; padding: 1.5rem; margin-bottom: 1.5rem; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        .filter-group { display: flex; gap: 1rem; align-items: center; }
+        select, button { padding: 0.5rem; border: 1px solid #ddd; border-radius: 5px; }
+        button { background: #667eea; color: white; border: none; cursor: pointer; }
+        button:hover { background: #5a67d8; }
+        .log-table { background: white; border-radius: 10px; overflow: hidden; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        table { width: 100%; border-collapse: collapse; }
+        th { background: #f8f9fa; padding: 1rem; text-align: left; font-weight: 600; color: #666; }
+        td { padding: 1rem; border-top: 1px solid #eee; }
+        .status-badge { padding: 0.25rem 0.75rem; border-radius: 20px; font-size: 0.8rem; font-weight: bold; }
+        .status-success { background: #d4edda; color: #155724; }
+        .status-failed { background: #f8d7da; color: #721c24; }
+        .status-processing { background: #fff3cd; color: #856404; }
+        .pagination { margin-top: 1rem; display: flex; gap: 0.5rem; justify-content: center; }
+        .page-btn { padding: 0.5rem 1rem; border: 1px solid #ddd; background: white; cursor: pointer; }
+        .page-btn.active { background: #667eea; color: white; border-color: #667eea; }
+        .nav-links { display: flex; gap: 2rem; margin-top: 1rem; }
+        .nav-links a { color: white; text-decoration: none; padding: 0.5rem 1rem; border-radius: 5px; transition: background 0.3s; }
+        .nav-links a:hover { background: rgba(255,255,255,0.1); }
+        .nav-links a.active { background: rgba(255,255,255,0.2); }
+    </style>
+</head>
+<body>
+    <div class="navbar">
+        <h1>📋 MinerU 日志查看</h1>
+        <div class="nav-links">
+            <a href="/">仪表盘</a>
+            <a href="/logs" class="active">日志查看</a>
+            <a href="/control">服务控制</a>
+                <a href="/announcement">公告管理</a>
+        </div>
+    </div>
+
+    <div class="container">
+        <div class="filters">
+            <div class="filter-group">
+                <select id="sourceFilter">
+                    <option value="">所有来源</option>
+                    <option value="mineru">MinerU</option>
+                    <option value="frontend">前端应用</option>
+                </select>
+                <select id="statusFilter">
+                    <option value="">所有状态</option>
+                    <option value="success">成功</option>
+                    <option value="failed">失败</option>
+                    <option value="processing">处理中</option>
+                </select>
+                <button onclick="loadLogs(1)">应用筛选</button>
+                <button onclick="resetFilters()">重置</button>
+            </div>
+        </div>
+
+        <div class="log-table">
+            <table id="logTable">
+                <thead>
+                    <tr>
+                        <th>时间</th>
+                        <th>任务ID</th>
+                        <th>文件名</th>
+                        <th>来源</th>
+                        <th>状态</th>
+                        <th>耗时(秒)</th>
+                        <th>页数</th>
+                        <th>错误信息</th>
+                    </tr>
+                </thead>
+                <tbody id="logBody">
+                    <!-- 动态加载日志 -->
+                </tbody>
+            </table>
+        </div>
+
+        <div class="pagination" id="pagination">
+            <!-- 动态加载分页 -->
+        </div>
+    </div>
+
+    <script>
+        let currentPage = 1;
+        let totalPages = 1;
+
+        async function loadLogs(page = 1) {
+            const source = document.getElementById('sourceFilter').value;
+            const status = document.getElementById('statusFilter').value;
+
+            const response = await fetch(`/api/logs?page=${page}&source=${source}&status=${status}`);
+            const data = await response.json();
+
+            // 渲染表格
+            const tbody = document.getElementById('logBody');
+            tbody.innerHTML = data.logs.map(log => `
+                <tr>
+                    <td>${new Date(log.timestamp).toLocaleString()}</td>
+                    <td>${log.task_id || '-'}</td>
+                    <td>${log.filename || '-'}</td>
+                    <td>${log.source}</td>
+                    <td>
+                        <span class="status-badge status-${log.status}">
+                            ${log.status}
+                        </span>
+                    </td>
+                    <td>${log.duration ? log.duration.toFixed(2) : '-'}</td>
+                    <td>${log.pages || '-'}</td>
+                    <td>${log.error_msg || '-'}</td>
+                </tr>
+            `).join('');
+
+            // 渲染分页
+            totalPages = Math.ceil(data.total / data.per_page);
+            renderPagination(data.page, totalPages);
+        }
+
+        function renderPagination(current, total) {
+            const pagination = document.getElementById('pagination');
+            let html = '';
+            for (let i = 1; i <= total; i++) {
+                html += `<button class="page-btn ${i === current ? 'active' : ''}" onclick="loadLogs(${i})">${i}</button>`;
+            }
+            pagination.innerHTML = html;
+        }
+
+        function resetFilters() {
+            document.getElementById('sourceFilter').value = '';
+            document.getElementById('statusFilter').value = '';
+            loadLogs(1);
+        }
+
+        // 自动刷新（每60秒）
+        loadLogs(1);
+        setInterval(() => loadLogs(currentPage), 60000);
+    </script>
+</body>
+</html>

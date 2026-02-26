@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>MinerU 服务控制</title>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #f5f5f5; }
+        .navbar { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 1rem 2rem; color: white; }
+        .navbar h1 { font-size: 1.5rem; }
+        .container { max-width: 800px; margin: 2rem auto; padding: 0 2rem; }
+        .control-card { background: white; border-radius: 10px; padding: 2rem; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        .status-section { margin-bottom: 2rem; padding-bottom: 2rem; border-bottom: 1px solid #eee; }
+        .status-item { margin: 1rem 0; }
+        .status-label { font-weight: 600; color: #666; display: inline-block; width: 120px; }
+        .status-badge { display: inline-block; padding: 0.25rem 0.75rem; border-radius: 20px; font-size: 0.9rem; font-weight: bold; }
+        .status-running { background: #d4edda; color: #155724; }
+        .status-stopped { background: #f8d7da; color: #721c24; }
+        .button-group { display: flex; gap: 1rem; margin-top: 1rem; }
+        .btn { padding: 0.75rem 1.5rem; border: none; border-radius: 5px; font-size: 1rem; cursor: pointer; transition: all 0.3s; }
+        .btn-primary { background: #667eea; color: white; }
+        .btn-primary:hover { background: #5a67d8; }
+        .btn-danger { background: #e53e3e; color: white; }
+        .btn-danger:hover { background: #c53030; }
+        .btn-secondary { background: #718096; color: white; }
+        .btn-secondary:hover { background: #4a5568; }
+        .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+        .alert { padding: 1rem; border-radius: 5px; margin: 1rem 0; display: none; }
+        .alert-success { background: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+        .alert-error { background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+        .nav-links { display: flex; gap: 2rem; margin-top: 1rem; }
+        .nav-links a { color: white; text-decoration: none; padding: 0.5rem 1rem; border-radius: 5px; transition: background 0.3s; }
+        .nav-links a:hover { background: rgba(255,255,255,0.1); }
+        .nav-links a.active { background: rgba(255,255,255,0.2); }
+    </style>
+</head>
+<body>
+    <div class="navbar">
+        <h1>⚙️ MinerU 服务控制</h1>
+        <div class="nav-links">
+            <a href="/">仪表盘</a>
+            <a href="/logs">日志查看</a>
+            <a href="/control" class="active">服务控制</a>
+                <a href="/announcement">公告管理</a>
+        </div>
+    </div>
+
+    <div class="container">
+        <div class="control-card">
+            <div class="status-section">
+                <h2>当前状态</h2>
+                <div class="status-item">
+                    <span class="status-label">运行状态:</span>
+                    <span id="statusBadge" class="status-badge">检查中...</span>
+                </div>
+                <div class="status-item">
+                    <span class="status-label">API端口:</span>
+                    <span id="apiPort">-</span>
+                </div>
+                <div class="status-item">
+                    <span class="status-label">WebUI端口:</span>
+                    <span id="webuiPort">-</span>
+                </div>
+                <div class="status-item">
+                    <span class="status-label">容器ID:</span>
+                    <span id="containerId">-</span>
+                </div>
+                <div class="status-item">
+                    <span class="status-label">CPU使用:</span>
+                    <span id="cpuUsage">-</span>
+                </div>
+                <div class="status-item">
+                    <span class="status-label">内存使用:</span>
+                    <span id="memoryUsage">-</span>
+                </div>
+            </div>
+
+            <div class="button-group">
+                <button class="btn btn-primary" onclick="controlService('start')" id="startBtn">▶ 启动服务</button>
+                <button class="btn btn-danger" onclick="controlService('stop')" id="stopBtn">⏹️ 停止服务</button>
+                <button class="btn btn-secondary" onclick="controlService('restart')" id="restartBtn">🔄 重启服务</button>
+            </div>
+
+            <div id="alert" class="alert"></div>
+        </div>
+    </div>
+
+    <script>
+        async function loadStatus() {
+            const response = await fetch('/api/mineru/status');
+            const status = await response.json();
+
+            // 更新状态显示
+            const badge = document.getElementById('statusBadge');
+            badge.className = `status-badge ${status.running ? 'status-running' : 'status-stopped'}`;
+            badge.textContent = status.running ? '✅ 运行中' : '⏸️ 已停止';
+
+            document.getElementById('apiPort').textContent = status.api_port;
+            document.getElementById('webuiPort').textContent = status.webui_port;
+            document.getElementById('containerId').textContent = status.container_id || '-';
+            document.getElementById('cpuUsage').textContent = status.cpu_usage || '-';
+            document.getElementById('memoryUsage').textContent = status.memory_usage || '-';
+
+            // 根据状态启用/禁用按钮
+            document.getElementById('startBtn').disabled = status.running;
+            document.getElementById('stopBtn').disabled = !status.running;
+            document.getElementById('restartBtn').disabled = !status.running;
+        }
+
+        async function controlService(action) {
+            const alert = document.getElementById('alert');
+            alert.style.display = 'none';
+
+            try {
+                const response = await fetch(`/api/mineru/control/${action}`, {
+                    method: 'POST'
+                });
+                const result = await response.json();
+
+                if (result.status === 'success') {
+                    alert.className = 'alert alert-success';
+                    alert.textContent = `操作成功：服务已${action === 'start' ? '启动' : action === 'stop' ? '停止' : '重启'}`;
+                    alert.style.display = 'block';
+
+                    // 3秒后隐藏提示
+                    setTimeout(() => {
+                        alert.style.display = 'none';
+                    }, 3000);
+
+                    // 刷新状态
+                    setTimeout(loadStatus, 2000);
+                } else {
+                    alert.className = 'alert alert-error';
+                    alert.textContent = `操作失败：${result.error || '未知错误'}`;
+                    alert.style.display = 'block';
+                }
+            } catch (error) {
+                alert.className = 'alert alert-error';
+                alert.textContent = `操作失败：${error.message}`;
+                alert.style.display = 'block';
+            }
+        }
+
+        // 自动刷新状态（每10秒）
+        loadStatus();
+        setInterval(loadStatus, 10000);
+    </script>
+</body>
+</html>
