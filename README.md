@@ -10,3 +10,5 @@ It's a wonderful thing when we conduct this software.We like this,so in there we
 ### 协议合规说明
 本项目基于AGPL 3.0协议开源，同时遵循minerU的开源许可证要求，完整源码可在本仓库获取。
 本软件禁止商用。
+
+使用者仅需下载前端客户端主程序进行打包。其他为不属于服务器上的minerU服务提供软件。
